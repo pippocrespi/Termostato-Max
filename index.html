@@ -3,11 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Termostato Max</title>
+<title>Termostato Max Full</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  input { width: 50px; }
+  table { border-collapse: collapse; margin-bottom: 20px; }
+  th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+</style>
 </head>
 <body>
-<h1>Termostato PWA Avanzato</h1>
+<h1>Termostato PWA Avanzato con Fasce Orarie</h1>
 
 <p>Temperatura: <span id="temp">?</span> °C</p>
 <p>Stato relè: <span id="relay">?</span></p>
@@ -15,9 +21,18 @@
 <button id="onBtn">Accendi</button>
 <button id="offBtn">Spegni</button>
 
-<h3>Setpoint temperatura:</h3>
+<h3>Setpoint manuale:</h3>
 <input type="number" id="setpoint" value="22">
 <button id="setBtn">Imposta</button>
+
+<h3>Programmazione fasce orarie (V4-V27)</h3>
+<table id="schedule">
+  <tr>
+    <th>Ora</th>
+    <th>Setpoint °C</th>
+  </tr>
+</table>
+<button id="sendSchedule">Invia Programma</button>
 
 <canvas id="chartTemp" width="400" height="150"></canvas>
 
@@ -25,29 +40,23 @@
 const BLYNK_TOKEN = "opRIBmiiafmHLZjaMQdMSD5GYr8HVoSH";
 const BLYNK_URL = `https://blynk.cloud/external/api/`;
 
-// Array storico temperature
 let tempHistory = [];
 
-// Funzione invio comando relè
+// --- Funzioni ---
 function setRelay(value) {
   fetch(`${BLYNK_URL}update?token=${BLYNK_TOKEN}&V0=${value}`);
 }
 
-// Funzione invio setpoint
 function setSetpoint(value) {
   fetch(`${BLYNK_URL}update?token=${BLYNK_TOKEN}&V3=${value}`);
 }
 
-// Funzione per leggere stato relè
 function getRelay() {
   fetch(`${BLYNK_URL}get?token=${BLYNK_TOKEN}&V1`)
     .then(res => res.text())
-    .then(val => {
-      document.getElementById("relay").innerText = val;
-    });
+    .then(val => document.getElementById("relay").innerText = val);
 }
 
-// Funzione per leggere temperatura
 function getTemp() {
   fetch(`${BLYNK_URL}get?token=${BLYNK_TOKEN}&V2`)
     .then(res => res.text())
@@ -59,15 +68,33 @@ function getTemp() {
     });
 }
 
-// Eventi bottoni
+// --- Fasce orarie ---
+const scheduleTable = document.getElementById('schedule');
+for (let i=0; i<24; i++) {
+  let row = scheduleTable.insertRow();
+  let cell1 = row.insertCell(0);
+  let cell2 = row.insertCell(1);
+  cell1.innerText = `${i}:00`;
+  cell2.innerHTML = `<input type="number" id="hour${i}" value="20" min="10" max="30">`;
+}
+
+function sendSchedule() {
+  for (let i=0; i<24; i++) {
+    let val = document.getElementById(`hour${i}`).value;
+    fetch(`${BLYNK_URL}update?token=${BLYNK_TOKEN}&V${i+4}=${val}`);
+  }
+}
+
+// --- Eventi bottoni ---
 document.getElementById("onBtn").addEventListener("click", () => setRelay(1));
 document.getElementById("offBtn").addEventListener("click", () => setRelay(0));
 document.getElementById("setBtn").addEventListener("click", () => {
   let val = parseFloat(document.getElementById("setpoint").value);
   setSetpoint(val);
 });
+document.getElementById("sendSchedule").addEventListener("click", sendSchedule);
 
-// Aggiorna dati ogni 2 secondi
+// --- Aggiornamento dati ---
 setInterval(getRelay, 2000);
 setInterval(getTemp, 2000);
 
@@ -87,9 +114,7 @@ const chart = new Chart(ctx, {
     },
     options: {
         animation: false,
-        scales: {
-            y: { beginAtZero: false }
-        }
+        scales: { y: { beginAtZero: false } }
     }
 });
 
