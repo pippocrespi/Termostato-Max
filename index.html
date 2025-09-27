@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Termostato Max</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<h1>Termostato PWA Avanzato</h1>
+
+<p>Temperatura: <span id="temp">?</span> °C</p>
+<p>Stato relè: <span id="relay">?</span></p>
+
+<button id="onBtn">Accendi</button>
+<button id="offBtn">Spegni</button>
+
+<h3>Setpoint temperatura:</h3>
+<input type="number" id="setpoint" value="22">
+<button id="setBtn">Imposta</button>
+
+<canvas id="chartTemp" width="400" height="150"></canvas>
+
+<script>
+const BLYNK_TOKEN = "IL_TUO_TOKEN_BLYNK";
+const BLYNK_URL = `https://blynk.cloud/external/api/`;
+
+// Array storico temperature
+let tempHistory = [];
+
+// Funzione invio comando relè
+function setRelay(value) {
+  fetch(`${BLYNK_URL}update?token=${BLYNK_TOKEN}&V0=${value}`);
+}
+
+// Funzione invio setpoint
+function setSetpoint(value) {
+  fetch(`${BLYNK_URL}update?token=${BLYNK_TOKEN}&V3=${value}`);
+}
+
+// Funzione per leggere stato relè
+function getRelay() {
+  fetch(`${BLYNK_URL}get?token=${BLYNK_TOKEN}&V1`)
+    .then(res => res.text())
+    .then(val => {
+      document.getElementById("relay").innerText = val;
+    });
+}
+
+// Funzione per leggere temperatura
+function getTemp() {
+  fetch(`${BLYNK_URL}get?token=${BLYNK_TOKEN}&V2`)
+    .then(res => res.text())
+    .then(val => {
+      document.getElementById("temp").innerText = val;
+      tempHistory.push(parseFloat(val));
+      if (tempHistory.length > 50) tempHistory.shift();
+      updateChart();
+    });
+}
+
+// Eventi bottoni
+document.getElementById("onBtn").addEventListener("click", () => setRelay(1));
+document.getElementById("offBtn").addEventListener("click", () => setRelay(0));
+document.getElementById("setBtn").addEventListener("click", () => {
+  let val = parseFloat(document.getElementById("setpoint").value);
+  setSetpoint(val);
+});
+
+// Aggiorna dati ogni 2 secondi
+setInterval(getRelay, 2000);
+setInterval(getTemp, 2000);
+
+// --- Chart.js ---
+const ctx = document.getElementById('chartTemp').getContext('2d');
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: Array(50).fill(''),
+        datasets: [{
+            label: 'Temperatura (°C)',
+            data: tempHistory,
+            borderColor: 'red',
+            fill: false,
+            tension: 0.1
+        }]
+    },
+    options: {
+        animation: false,
+        scales: {
+            y: { beginAtZero: false }
+        }
+    }
+});
+
+function updateChart() {
+    chart.data.datasets[0].data = tempHistory;
+    chart.update();
+}
+</script>
+</body>
+</html>
